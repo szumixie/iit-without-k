@@ -1,0 +1,10 @@
+include: .
+depend: cubical
+flags:
+  --safe
+  --cubical
+  --guardedness
+  --no-import-sorts
+  --no-eta-equality
+  --hidden-argument-puns
+  -WnoUnsupportedIndexedMatch
