@@ -1,9 +1,9 @@
 include: .
 depend: cubical
 flags:
-  --safe
   --cubical
   --guardedness
+  --type-in-type
   --no-import-sorts
   --no-eta-equality
   --hidden-argument-puns

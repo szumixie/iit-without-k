@@ -1,37 +1,17 @@
 module IITWithoutK.Prelude where
 
 open import Cubical.Foundations.Prelude public hiding (lower)
-open import Cubical.Foundations.HLevels public
-open import Cubical.Data.Sigma public using (_×_)
-open import Cubical.Data.Unit public
-  using (tt) renaming (Unit to ⊤; isPropUnit to isProp⊤)
-open import Cubical.Data.Empty public using (⊥; isProp⊥) renaming (rec to ⊥-rec)
+open import Cubical.Data.Unit public using (tt) renaming (Unit to ⊤)
+open import Cubical.Data.Empty public using (⊥) renaming (rec to ⊥-rec)
 open import Cubical.Data.Nat public using (ℕ; zero; suc; _+_)
 
-isPropΣ→isProp-snd :
-  {A : Type} {B : A → Type} → isSet A → isProp (Σ A B) → ∀ a → isProp (B a)
-isPropΣ→isProp-snd {B} isSetA isPropΣ a b₀ b₁ i =
-  comp
-    (λ j → B (isSetA a a (λ i → isPropΣ (a , b₀) (a , b₁) i .fst) refl j i))
-    (λ where
-      j (i = i0) → b₀
-      j (i = i1) → b₁)
-    (isPropΣ (a , b₀) (a , b₁) i .snd)
+record TransportFiller (A : I → Type) (a₀ : A i0) : Type where
+  field
+    {end} : A i1
+    filler : PathP A a₀ end
 
-substProp : {A : Type} → isProp A → (B : A → Type) → ∀ {a₀ a₁} → B a₀ → B a₁
-substProp isPropA B {a₀} {a₁} b₀ = filler i1
-  module substProp where
-  filler : ∀ i → _
-  filler i = transport-filler (λ i → B (isPropA a₀ a₁ i)) b₀ i
-
-  filler# : (aᵖ : a₀ ≡ a₁) → PathP (λ i → B (aᵖ i)) b₀ (filler i1)
-  filler# aᵖ i =
-    comp
-      (λ j → B (isProp→isSet isPropA _ _ (isPropA a₀ a₁) aᵖ j i))
-      (λ where
-        j (i = i0) → b₀
-        j (i = i1) → filler i1)
-      (filler i)
+transport-fill : ∀ A a₀ → TransportFiller A a₀
+transport-fill A a₀ = record { filler = transport-filler (λ 𝑖 → A 𝑖) a₀ }
 
 _≤ᵣ_ : ℕ → ℕ → Type
 zero ≤ᵣ n = ⊤
@@ -51,13 +31,13 @@ open _≤_
 0-least = mk-≤ tt
 
 ≤-suc : ∀ {m n} → m ≤ n → suc m ≤ suc n
-≤-suc (mk-≤ p) = mk-≤ p
+≤-suc (mk-≤ m≤n) = mk-≤ m≤n
 
 ¬suc≤0 : ∀ {n} → suc n ≤ zero → ⊥
 ¬suc≤0 ()
 
 ≤-unsuc : ∀ {m n} → suc m ≤ suc n → m ≤ n
-≤-unsuc (mk-≤ p) = mk-≤ p
+≤-unsuc (mk-≤ m≤n) = mk-≤ m≤n
 
 ≤-refl : ∀ {n} → n ≤ n
 ≤-refl {(zero)} = 0-least
@@ -65,8 +45,9 @@ open _≤_
 
 infixr 30 _◂_
 _◂_ : ∀ {l m n} → l ≤ m → m ≤ n → l ≤ n
-_◂_ {(zero)} {m} {n} p q = 0-least
-_◂_ {suc l} {suc m} {suc n} p q = ≤-suc (≤-unsuc p ◂ ≤-unsuc q)
+_◂_ {(zero)} {m} {n} 0≤m m≤n = 0-least
+_◂_ {suc l} {suc m} {suc n} 1+l≤1+m 1+m≤1+n =
+  ≤-suc (≤-unsuc 1+l≤1+m ◂ ≤-unsuc 1+m≤1+n)
 
 ≤-step : ∀ {n} → n ≤ suc n
 ≤-step {(zero)} = 0-least
@@ -75,6 +56,31 @@ _◂_ {suc l} {suc m} {suc n} p q = ≤-suc (≤-unsuc p ◂ ≤-unsuc q)
 ≤-steps : ∀ m {n} → n ≤ m + n
 ≤-steps zero = ≤-refl
 ≤-steps (suc m) = ≤-steps m ◂ ≤-step
+
+infixl 6 _⊔_
+_⊔_ : ℕ → ℕ → ℕ
+zero ⊔ zero = zero
+zero ⊔ suc n = suc n
+suc m ⊔ zero = suc m
+suc m ⊔ suc n = suc (m ⊔ n)
+
+⊔-inₗ : ∀ m n → m ≤ m ⊔ n
+⊔-inₗ zero zero = 0-least
+⊔-inₗ zero (suc n) = 0-least
+⊔-inₗ (suc m) zero = ≤-refl
+⊔-inₗ (suc m) (suc n) = ≤-suc (⊔-inₗ _ _)
+
+⊔-inᵣ : ∀ m n → n ≤ m ⊔ n
+⊔-inᵣ zero zero = 0-least
+⊔-inᵣ zero (suc n) = ≤-refl
+⊔-inᵣ (suc m) zero = 0-least
+⊔-inᵣ (suc m) (suc n) = ≤-suc (⊔-inᵣ _ _)
+
+⊔-least : ∀ {k m n} → k ≤ n → m ≤ n → k ⊔ m ≤ n
+⊔-least {(zero)} {(zero)} p q = 0-least
+⊔-least {(zero)} {suc m} p q = q
+⊔-least {suc k} {(zero)} p q = p
+⊔-least {suc k} {suc m} {suc n} p q = ≤-suc (⊔-least (≤-unsuc p) (≤-unsuc q))
 
 infix 4 _≐_
 record _≐_ (m n : ℕ) : Type where
@@ -85,232 +91,237 @@ record _≐_ (m n : ℕ) : Type where
     ge : n ≤ m
 
 ≐-suc : ∀ {m n} → m ≐ n → suc m ≐ suc n
-≐-suc (mk-≐ p q) = mk-≐ (≤-suc p) (≤-suc q)
+≐-suc (mk-≐ m≤n n≤m) = mk-≐ (≤-suc m≤n) (≤-suc n≤m)
 
 ≐-unsuc : ∀ {m n} → suc m ≐ suc n → m ≐ n
-≐-unsuc (mk-≐ p q) = mk-≐ (≤-unsuc p) (≤-unsuc q)
+≐-unsuc (mk-≐ 1+m≤1+n 1+n≤1+m) = mk-≐ (≤-unsuc 1+m≤1+n) (≤-unsuc 1+n≤1+m)
 
 ≐-refl : ∀ {n} → n ≐ n
 ≐-refl = mk-≐ ≤-refl ≤-refl
 
 ≐→≤ : ∀ {m n} → m ≐ n → m ≤ n
-≐→≤ (mk-≐ p q) = p
+≐→≤ (mk-≐ m≤n n≤m) = m≤n
 
 ≐→≡ : ∀ {m n} → m ≐ n → m ≡ n
-≐→≡ {(zero)} {(zero)} p i = zero
-≐→≡ {suc m} {suc n} p i = suc (≐→≡ (≐-unsuc p) i)
+≐→≡ {(zero)} {(zero)} 0≐0 𝑖 = zero
+≐→≡ {suc m} {suc n} 1+m≐1+n 𝑖 = suc (≐→≡ (≐-unsuc 1+m≐1+n) 𝑖)
 
-≐→≤-filler : ∀ {m n} (p : m ≐ n) i → m ≤ ≐→≡ p i
-≐→≤-filler {m} p i = transport-filler (λ i → m ≤ ≐→≡ p i) ≤-refl i
+≐→≤-filler : ∀ {m n} (m≐n : m ≐ n) 𝑖 → m ≤ ≐→≡ m≐n 𝑖
+≐→≤-filler {m} m≐n 𝑖 = transport-filler (λ 𝑖 → m ≤ ≐→≡ m≐n 𝑖) ≤-refl 𝑖
 
-record ≤-MAlg (m n : ℕ) : Type₁ where
-  constructor mk-≤-MAlg
+record ≤-Cases (m n : ℕ) : Type where
+  constructor mk-≤-Cases
   field
     T : m ≤ suc n → Type
-    lt : (p : m ≤ n) → T (p ◂ ≤-step)
-    eq : (p : m ≐ suc n) → T (≐→≤ p)
+    lt : (m≤n : m ≤ n) → T (m≤n ◂ ≤-step)
+    eq : (m≐1+n : m ≐ suc n) → T (≐→≤ m≐1+n)
 
-lower-≤-MAlg : ∀ {m n} → ≤-MAlg (suc m) (suc n) → ≤-MAlg m n
-lower-≤-MAlg M =
-  λ where
-    .≤-MAlg.T p → T (≤-suc p)
-    .≤-MAlg.lt p → lt (≤-suc p)
-    .≤-MAlg.eq p → eq (≐-suc p)
-  where
-  open ≤-MAlg M
+module _ {m n} (M : ≤-Cases (suc m) (suc n)) where
+  open ≤-Cases M
 
-record ≤-Match {m n} (M : ≤-MAlg m n) : Type where
-  open ≤-MAlg M
+  lower-≤-Cases : ≤-Cases m n
+  lower-≤-Cases .≤-Cases.T m≤1+n = T (≤-suc m≤1+n)
+  lower-≤-Cases .≤-Cases.lt m≤n = lt (≤-suc m≤n)
+  lower-≤-Cases .≤-Cases.eq m≤1+n = eq (≐-suc m≤1+n)
+
+record ≤-Match {m n} (M : ≤-Cases m n) : Type where
+  open ≤-Cases M
   field
-    match : ∀ p → T p
-    lt-β : (p : m ≤ n) → match (p ◂ ≤-step) ≡ lt p
-    eq-β : (p : m ≐ suc n) → match (≐→≤ p) ≡ eq p
+    match : ∀ m≤1+n → T m≤1+n
+    lt-β : ∀ m≤n → match (m≤n ◂ ≤-step) ≡ lt m≤n
+    eq-β : ∀ m≐1+n → match (≐→≤ m≐1+n) ≡ eq m≐1+n
 
-unlower-≤-Match :
-  ∀ {m n} (M : ≤-MAlg (suc m) (suc n)) → ≤-Match (lower-≤-MAlg M) → ≤-Match M
-unlower-≤-Match M F =
-  λ where
-    .≤-Match.match p → match (≤-unsuc p)
-    .≤-Match.lt-β p → lt-β (≤-unsuc p)
-    .≤-Match.eq-β p → eq-β (≐-unsuc p)
+module _ {m n} (M : ≤-Cases (suc m) (suc n)) (F : ≤-Match (lower-≤-Cases M))
   where
   open ≤-Match F
 
-≤-match : ∀ {m n} (M : ≤-MAlg m n) → ≤-Match M
-≤-match {suc m} {suc n} M = unlower-≤-Match M (≤-match (lower-≤-MAlg M))
+  unlower-≤-Match : ≤-Match M
+  unlower-≤-Match .≤-Match.match m≤1+n = match (≤-unsuc m≤1+n)
+  unlower-≤-Match .≤-Match.lt-β m≤n = lt-β (≤-unsuc m≤n)
+  unlower-≤-Match .≤-Match.eq-β m≐1+n = eq-β (≐-unsuc m≐1+n)
+
+≤-match : ∀ {m n} (M : ≤-Cases m n) → ≤-Match M
+≤-match {suc m} {suc n} M = unlower-≤-Match M (≤-match (lower-≤-Cases M))
 ≤-match {suc (suc m)} {(zero)} M = λ where .≤-Match.match ()
 ≤-match {suc zero} {(zero)} M =
   λ where
-    .≤-Match.match p → eq ≐-refl
-    .≤-Match.eq-β p → refl
+    .≤-Match.match 1≤1 → eq ≐-refl
+    .≤-Match.eq-β 1≐1 → refl
   where
-  open ≤-MAlg M
+  open ≤-Cases M
 ≤-match {(zero)} {(n)} M =
   λ where
-    .≤-Match.match p → lt 0-least
-    .≤-Match.lt-β p → refl
+    .≤-Match.match 0≤1+n → lt 0-least
+    .≤-Match.lt-β 0≤n → refl
   where
-  open ≤-MAlg M
+  open ≤-Cases M
 
-record ≤-MAlgP (m n : ℕ) : Type₁ where
-  constructor mk-≤-MAlgP
+record ≤-CasesP (m n : ℕ) : Type where
+  constructor mk-≤-CasesP
   field
     {T-lt} : m ≤ n → Type
-    {T-eq} : m ≐ 1 + n → Type
+    {T-eq} : m ≐ suc n → Type
 
-    T : m ≤ 1 + n → Type
-    T-lt-β : ∀ p → T (p ◂ ≤-step) ≡ T-lt p
-    T-eq-β : ∀ p → T (≐→≤ p) ≡ T-eq p
+    T : m ≤ suc n → Type
+    T-lt-β : ∀ m≤n → T (m≤n ◂ ≤-step) ≡ T-lt m≤n
+    T-eq-β : ∀ m≐1+n → T (≐→≤ m≐1+n) ≡ T-eq m≐1+n
 
-    lt : ∀ p → T-lt p
-    eq : ∀ p → T-eq p
+    lt : ∀ m≤n → T-lt m≤n
+    eq : ∀ m≐1+n → T-eq m≐1+n
 
-record ≤-MatchP {m n} (M : ≤-MAlgP m n) : Type where
-  open ≤-MAlgP M
+record ≤-MatchP {m n} (M : ≤-CasesP m n) : Type where
+  open ≤-CasesP M
   field
-    match : ∀ p → T p
-    lt-β : ∀ p → PathP (λ i → T-lt-β p i) (match (p ◂ ≤-step)) (lt p)
-    eq-β : ∀ p → PathP (λ i → T-eq-β p i) (match (≐→≤ p)) (eq p)
+    match : ∀ m≤1+n → T m≤1+n
+    lt-β : ∀ m≤n → PathP (λ 𝑖 → T-lt-β m≤n 𝑖) (match (m≤n ◂ ≤-step)) (lt m≤n)
+    eq-β : ∀ m≐1+n → PathP (λ 𝑖 → T-eq-β m≐1+n 𝑖) (match (≐→≤ m≐1+n)) (eq m≐1+n)
 
-≤-matchP : ∀ {m n} (M : ≤-MAlgP m n) → ≤-MatchP M
-≤-matchP {m} {n} M =
-  λ where
-    .≤-MatchP.match → match
-    .≤-MatchP.lt-β p i →
-      comp
-        (λ j → T-lt-β p (i ∧ j))
-        (λ where
-          j (i = i0) → match (p ◂ ≤-step)
-          j (i = i1) → match-lt.filler p (~ j))
-        (match.lt-β p i)
-    .≤-MatchP.eq-β p i →
-      comp
-        (λ j → T-eq-β p (i ∧ j))
-        (λ where
-          j (i = i0) → match (≐→≤ p)
-          j (i = i1) → match-eq.filler p (~ j))
-        (match.eq-β p i)
-  where
-  open ≤-MAlgP M
+module ≤-matchP {m n} (M : ≤-CasesP m n) where
+  open ≤-CasesP M
 
-  match-lt : (p : m ≤ n) → T (p ◂ ≤-step)
-  match-lt p = filler i1
+  match-lt : (m≤n : m ≤ n) → T (m≤n ◂ ≤-step)
+  match-lt m≤n = filler i1
     module match-lt where
-    filler : ∀ i → _
-    filler i = transport-filler (λ i → T-lt-β p (~ i)) (lt p) i
+    filler : ∀ 𝑖 → _
+    filler 𝑖 = transport-filler (λ 𝑖 → T-lt-β m≤n (~ 𝑖)) (lt m≤n) 𝑖
 
-  match-eq : (p : m ≐ 1 + n) → T (≐→≤ p)
-  match-eq p = filler i1
+  match-eq : (m≐1+n : m ≐ suc n) → T (≐→≤ m≐1+n)
+  match-eq m≐1+n = filler i1
     module match-eq where
-    filler : ∀ i → _
-    filler i = transport-filler (λ i → T-eq-β p (~ i)) (eq p) i
+    filler : ∀ 𝑖 → _
+    filler 𝑖 = transport-filler (λ 𝑖 → T-eq-β m≐1+n (~ 𝑖)) (eq m≐1+n) 𝑖
 
-  module match = ≤-Match (≤-match (mk-≤-MAlg T match-lt match-eq))
+  module match = ≤-Match (≤-match (mk-≤-Cases T match-lt match-eq))
   open match using (match)
 
-record ≤-Lim-AlgP : Type₁ where
-  constructor mk-≤-Lim-Alg
+  ≤-matchP : ≤-MatchP M
+  ≤-matchP .≤-MatchP.match = match
+  ≤-matchP .≤-MatchP.lt-β m≤n 𝑖 =
+    comp
+      (λ 𝑗 → T-lt-β m≤n (𝑖 ∧ 𝑗))
+      (λ where
+        𝑗 (𝑖 = i0) → match (m≤n ◂ ≤-step)
+        𝑗 (𝑖 = i1) → match-lt.filler m≤n (~ 𝑗))
+      (match.lt-β m≤n 𝑖)
+  ≤-matchP .≤-MatchP.eq-β m≐1+n 𝑖 =
+    comp
+      (λ 𝑗 → T-eq-β m≐1+n (𝑖 ∧ 𝑗))
+      (λ where
+        𝑗 (𝑖 = i0) → match (≐→≤ m≐1+n)
+        𝑗 (𝑖 = i1) → match-eq.filler m≐1+n (~ 𝑗))
+      (match.eq-β m≐1+n 𝑖)
+
+open ≤-matchP public using (≤-matchP)
+
+record ≤-LimDiagP : Type where
+  constructor mk-≤-LimDiagP
   field
     h : ℕ
     ¬h≤0 : h ≤ 0 → ⊥
 
     {Tᴮ} : ∀ n → h ≤ n → Type
-    {T-lower} : ∀ n p → Tᴮ (1 + n) (p ◂ ≤-step) ≡ Tᴮ n p
+    {T-lower} : ∀ n h≤n → Tᴮ (suc n) (h≤n ◂ ≤-step) ≡ Tᴮ n h≤n
 
     T : Type
-    {T-proj} : ∀ n p → T ≡ Tᴮ n p
-    T-proj-lower :
-      ∀ n p →
-      Square (T-proj (1 + n) (p ◂ ≤-step)) (T-proj n p) refl (T-lower n p)
+    {T-proj} : ∀ n h≤n → T ≡ Tᴮ n h≤n
+    T-lower-proj :
+      ∀ n h≤n →
+      Square (T-proj (suc n) (h≤n ◂ ≤-step)) (T-proj n h≤n) refl (T-lower n h≤n)
 
-    {tᴮ} : ∀ n p → Tᴮ n p
+    {tᴮ} : ∀ n h≤n → Tᴮ n h≤n
     lower :
-      ∀ n p → PathP (λ i → T-lower n p i) (tᴮ (1 + n) (p ◂ ≤-step)) (tᴮ n p)
+      ∀ n h≤n →
+      PathP (λ 𝑖 → T-lower n h≤n 𝑖) (tᴮ (suc n) (h≤n ◂ ≤-step)) (tᴮ n h≤n)
 
-record ≤-LimP (M : ≤-Lim-AlgP) : Type where
-  open ≤-Lim-AlgP M
+record ≤-LimP (M : ≤-LimDiagP) : Type where
+  open ≤-LimDiagP M
   field
     lim : T
-    proj : ∀ n p → PathP (λ i → T-proj n p i) lim (tᴮ n p)
-    proj-lower :
-      ∀ n p →
+    proj : ∀ n h≤n → PathP (λ 𝑖 → T-proj n h≤n 𝑖) lim (tᴮ n h≤n)
+    lower-proj :
+      ∀ n h≤n →
       SquareP
-        (λ i j → T-proj-lower n p i j)
-        (proj (1 + n) (p ◂ ≤-step))
-        (proj n p)
+        (λ 𝑖 𝑗 → T-lower-proj n h≤n 𝑖 𝑗)
+        (proj (suc n) (h≤n ◂ ≤-step))
+        (proj n h≤n)
         refl
-        (lower n p)
+        (lower n h≤n)
 
-≤-limP : (M : ≤-Lim-AlgP) → ≤-LimP M
-≤-limP M =
-  λ where
-    .≤-LimP.lim → lim
-    .≤-LimP.proj → proj
-    .≤-LimP.proj-lower → proj-lower
-  where
-  open ≤-Lim-AlgP M
+module ≤-limP (M : ≤-LimDiagP) where
+  open ≤-LimDiagP M
 
   lim : T
   lim = filler i1
     module lim where
-    filler : ∀ i → _
-    filler i = transport-filler (λ i → T-proj h ≤-refl (~ i)) (tᴮ h ≤-refl) i
+    filler : ∀ 𝑖 → _
+    filler 𝑖 = transport-filler (λ 𝑖 → T-proj h ≤-refl (~ 𝑖)) (tᴮ h ≤-refl) 𝑖
 
   proj₊-eq :
-    ∀ n p → PathP (λ i → T-proj (1 + n) (≐→≤ p) i) lim (tᴮ (1 + n) (≐→≤ p))
-  proj₊-eq n p i =
+    ∀ n h≐1+n →
+    PathP (λ 𝑖 → T-proj (suc n) (≐→≤ h≐1+n) 𝑖) lim (tᴮ (suc n) (≐→≤ h≐1+n))
+  proj₊-eq n h≐1+n 𝑖 =
     comp
-      (λ j → T-proj (≐→≡ p j) (≐→≤-filler p j) i)
+      (λ 𝑗 → T-proj (≐→≡ h≐1+n 𝑗) (≐→≤-filler h≐1+n 𝑗) 𝑖)
       (λ where
-        j (i = i0) → lim
-        j (i = i1) → tᴮ (≐→≡ p j) (≐→≤-filler p j))
-      (lim.filler (~ i))
+        𝑗 (𝑖 = i0) → lim
+        𝑗 (𝑖 = i1) → tᴮ (≐→≡ h≐1+n 𝑗) (≐→≤-filler h≐1+n 𝑗))
+      (lim.filler (~ 𝑖))
 
-  proj : ∀ n p → PathP (λ i → T-proj n p i) lim (tᴮ n p)
-  proj₊ : ∀ n p → PathP (λ i → T-proj (1 + n) p i) lim (tᴮ (1 + n) p)
+  proj : ∀ n h≤n → PathP (λ 𝑖 → T-proj n h≤n 𝑖) lim (tᴮ n h≤n)
+  proj₊ :
+    ∀ n h≤1+n → PathP (λ 𝑖 → T-proj (suc n) h≤1+n 𝑖) lim (tᴮ (suc n) h≤1+n)
   proj₊-lt :
-    ∀ n p →
-    PathP (λ i → T-proj (1 + n) (p ◂ ≤-step) i) lim (tᴮ (1 + n) (p ◂ ≤-step))
+    ∀ n h≤n →
+    PathP (λ 𝑖 → T-proj (suc n) (h≤n ◂ ≤-step) 𝑖)
+      lim (tᴮ (suc n) (h≤n ◂ ≤-step))
 
-  proj zero p = ⊥-rec (¬h≤0 p)
-  proj (suc n) p = proj₊ n p
+  proj zero h≤0 = ⊥-rec (¬h≤0 h≤0)
+  proj (suc n) h≤1+n = proj₊ n h≤1+n
 
   proj₊ n = match
     module proj₊ where
     open ≤-Match
       (≤-match
-        (mk-≤-MAlg
-          (λ p → PathP (λ i → T-proj (1 + n) p i) lim (tᴮ (1 + n) p))
+        (mk-≤-Cases
+          (λ h≤1+n →
+            PathP (λ 𝑖 → T-proj (suc n) h≤1+n 𝑖) lim (tᴮ (suc n) h≤1+n))
           (proj₊-lt n)
           (proj₊-eq n)))
       public
 
-  proj₊-lt n p = λ i → filler i1 i
+  proj₊-lt n h≤n = λ 𝑖 → filler i1 𝑖
     module proj₊-lt where
-    filler : ∀ j i → _
-    filler j i =
+    filler : ∀ 𝑗 𝑖 → _
+    filler 𝑗 𝑖 =
       fill
-        (λ j → T-proj-lower n p (~ j) i)
+        (λ 𝑗 → T-lower-proj n h≤n (~ 𝑗) 𝑖)
         (λ where
-          j (i = i0) → lim
-          j (i = i1) → lower n p (~ j))
-        (inS (proj n p i))
-        j
+          𝑗 (𝑖 = i0) → lim
+          𝑗 (𝑖 = i1) → lower n h≤n (~ 𝑗))
+        (inS (proj n h≤n 𝑖))
+        𝑗
 
-  proj-lower :
-    ∀ n p →
+  lower-proj :
+    ∀ n h≤n →
     SquareP
-      (λ i j → T-proj-lower n p i j)
-      (proj (1 + n) (p ◂ ≤-step))
-      (proj n p)
+      (λ 𝑖 𝑗 → T-lower-proj n h≤n 𝑖 𝑗)
+      (proj (suc n) (h≤n ◂ ≤-step))
+      (proj n h≤n)
       refl
-      (lower n p)
-  proj-lower n p i j =
+      (lower n h≤n)
+  lower-proj n h≤n 𝑖 𝑗 =
     comp
-      (λ k → T-proj-lower n p (i ∧ k) j)
+      (λ 𝑘 → T-lower-proj n h≤n (𝑖 ∧ 𝑘) 𝑗)
       (λ where
-        k (i = i0) → proj (1 + n) (p ◂ ≤-step) j
-        k (i = i1) → proj₊-lt.filler n p (~ k) j
-        k (j = i0) → lim
-        k (j = i1) → lower n p (i ∧ k))
-      (proj₊.lt-β n p i j)
+        𝑘 (𝑖 = i0) → proj (suc n) (h≤n ◂ ≤-step) 𝑗
+        𝑘 (𝑖 = i1) → proj₊-lt.filler n h≤n (~ 𝑘) 𝑗
+        𝑘 (𝑗 = i0) → lim
+        𝑘 (𝑗 = i1) → lower n h≤n (𝑖 ∧ 𝑘))
+      (proj₊.lt-β n h≤n 𝑖 𝑗)
+
+  ≤-limP : ≤-LimP M
+  ≤-limP .≤-LimP.lim = lim
+  ≤-limP .≤-LimP.proj = proj
+  ≤-limP .≤-LimP.lower-proj = lower-proj
+
+open ≤-limP public using (≤-limP)
